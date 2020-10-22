@@ -1,17 +1,3 @@
-## My Project
+# Overview
 
-TODO: Fill this README out!
-
-Be sure to:
-
-* Change the title in this README
-* Edit your repository description on GitHub
-
-## Security
-
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
-
-## License
-
-This library is licensed under the MIT-0 License. See the LICENSE file.
-
+Demo showcasing the use of new FlinkKinesisConsumer with Enhanced Fan-Out (EFO) support. In this demo, we'll explore how to use multiple EFO consumers against a single Kinesis Data Stream (KDS) to achieve higher consumption throughput - esp with a stream that has Long Term Retention (LTR) enabled.

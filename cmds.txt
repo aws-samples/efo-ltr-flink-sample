@@ -1,0 +1,14 @@
+mvn archetype:generate                               \
+      -DarchetypeGroupId=org.apache.flink              \
+      -DarchetypeArtifactId=flink-quickstart-java      \
+      -DarchetypeVersion=1.8.0 \
+      -DgroupId=com.amazonaws.services.kinesisanalytics \
+      -DartifactId=bizruleflinkdemo \
+      -DinteractiveMode=false
+
+
+mvn exec:java -Dexec.mainClass="com.amazonaws.services.kinesisanalytics.StreamingJob"
+
+mvn clean compile exec:java -Dexec.mainClass="com.amazonaws.services.kinesisanalytics.StreamingJob"
+
+mvn compile exec:java -Dexec.mainClass="com.amazonaws.services.kinesisanalytics.StreamingJob"
