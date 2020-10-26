@@ -48,13 +48,16 @@ public class TimeSliceFilter extends BroadcastProcessFunction<EmployeeInfo, Long
             bufferedElements.add(employeeInfo);
         } else {
             // first deal w/ buffer
-            for (EmployeeInfo ei : bufferedElements.get()) {
-                if (ei.getEventtimestamp() < threshold) {
-                    collector.collect(ei);
+            Iterable<EmployeeInfo> bufferedIterables = bufferedElements.get();
+            if(bufferedIterables != null) {
+                for (EmployeeInfo ei : bufferedIterables) {
+                    if (ei.getEventtimestamp() < threshold) {
+                        collector.collect(ei);
+                    }
                 }
-            }
 
-            bufferedElements.clear();
+                bufferedElements.clear();
+            }
 
             // now deal w/ current message
             if (employeeInfo.getEventtimestamp() < threshold) {

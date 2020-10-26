@@ -21,6 +21,7 @@ package com.amazonaws.services.kinesisanalytics;
 import com.amazonaws.services.kinesisanalytics.payloads.EmployeeInfo;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
 import com.amazonaws.services.kinesisanalytics.utils.EmployeeInfoBucketAssigner;
+import com.amazonaws.services.kinesisanalytics.utils.EmployeeInfoDeserializationSchema;
 import com.amazonaws.services.kinesisanalytics.utils.ParameterToolUtils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -28,12 +29,15 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.formats.parquet.avro.ParquetAvroWriters;
+import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.BroadcastStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.kinesis.connectors.flink.FlinkKinesisConsumer;
@@ -52,7 +56,7 @@ public class StreamingJob {
     private static final String DEFAULT_REGION_NAME = "us-east-2";
     private static final Long TIME_SLICE = 60L * 60L; // 1 hour
 
-    public static DataStream<String> createKinesisEFOSource(StreamExecutionEnvironment env,
+    public static DataStream<EmployeeInfo> createKinesisEFOSource(StreamExecutionEnvironment env,
                                                             ParameterTool parameter,
                                                             String efoConsumerName,
                                                             long initialTimestamp) throws Exception {
@@ -63,15 +67,19 @@ public class StreamingJob {
         consumerConfig.put(ConsumerConfigConstants.STREAM_INITIAL_TIMESTAMP, String.valueOf(initialTimestamp));
 
         consumerConfig.put(AWSConfigConstants.AWS_REGION, DEFAULT_REGION_NAME);
-        consumerConfig.put(ConsumerConfigConstants.RECORD_PUBLISHER_TYPE, ConsumerConfigConstants.RecordPublisherType.EFO.name());
+        consumerConfig.put(ConsumerConfigConstants.RECORD_PUBLISHER_TYPE,
+                ConsumerConfigConstants.RecordPublisherType.EFO.name());
         consumerConfig.put(ConsumerConfigConstants.EFO_CONSUMER_NAME, efoConsumerName);
 
-        consumerConfig.put(ConsumerConfigConstants.EFO_REGISTRATION_TYPE, ConsumerConfigConstants.EFORegistrationType.EAGER.name());
+        consumerConfig.put(ConsumerConfigConstants.EFO_REGISTRATION_TYPE,
+                ConsumerConfigConstants.EFORegistrationType.EAGER.name());
 
         String stream = parameter.get("InputStreamName", DEFAULT_STREAM_NAME);
 
-        DataStream kinesis =
-                env.addSource(new FlinkKinesisConsumer<>(stream, new SimpleStringSchema(), consumerConfig));
+        FlinkKinesisConsumer<EmployeeInfo> flinkKinesisConsumer =
+                new FlinkKinesisConsumer<>(stream, new EmployeeInfoDeserializationSchema(), consumerConfig);
+
+        DataStream<EmployeeInfo> kinesis = env.addSource(flinkKinesisConsumer);
 
         return kinesis;
     }
@@ -94,7 +102,6 @@ public class StreamingJob {
 
         DataStream<EmployeeInfo> input =
                 createKinesisEFOSource(env, parameter, efoConsumerName, beginTimestamp)
-                        .map(new JsonToEmployeeInfoMap())
                         .connect(broadcastTokens)
                         .process(new TimeSliceFilter());
 
@@ -172,13 +179,16 @@ public class StreamingJob {
     private static DataStream<EmployeeInfo> setupForNormal(StreamExecutionEnvironment env,
                                                            ParameterTool parameter) throws Exception {
         long beginTimestamp = parameter.getLong("normalProcessingBeginTimestamp");
-        return createKinesisEFOSource(env, parameter, "my-efo-consumer-1", beginTimestamp)
-                .map(new JsonToEmployeeInfoMap());
+        return createKinesisEFOSource(env, parameter, "my-efo-consumer-1", beginTimestamp);
     }
 
     public static void main(String[] args) throws Exception {
         // set up the streaming execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        // use approx arrival time within Kinesis Data Streams for timestamp
+        // https://ci.apache.org/projects/flink/flink-docs-stable/dev/connectors/kinesis.html#event-time-for-consumed-records
+        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
         ParameterTool parameter;
 

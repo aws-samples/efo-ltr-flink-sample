@@ -21,7 +21,7 @@ under the License.
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.amazonaws.services.kinesisanalytics</groupId>
-	<artifactId>bizruleflinkdemo</artifactId>
+	<artifactId>efoltrflinksample</artifactId>
 	<version>1.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
